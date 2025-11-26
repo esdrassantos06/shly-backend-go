@@ -1,0 +1,159 @@
+basePath: /
+definitions:
+  domain.Link:
+    properties:
+      clicks:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: string
+      short_id:
+        type: string
+      status:
+        $ref: '#/definitions/domain.LinkStatus'
+      target_url:
+        type: string
+      user_id:
+        type: string
+    type: object
+  domain.LinkStatus:
+    enum:
+    - ACTIVE
+    - PAUSED
+    type: string
+    x-enum-varnames:
+    - StatusActive
+    - StatusPaused
+  handlers.CreateShortLinkRequest:
+    properties:
+      custom_slug:
+        example: my-custom-link
+        type: string
+      target_url:
+        example: https://example.com
+        type: string
+    required:
+    - target_url
+    type: object
+  handlers.CreateShortLinkResponse:
+    properties:
+      details:
+        $ref: '#/definitions/domain.Link'
+      short_url:
+        example: http://localhost:8080/abc123
+        type: string
+    type: object
+  handlers.ErrorResponse:
+    properties:
+      error:
+        example: Invalid input
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: API for URL shortening with support for custom slugs
+  termsOfService: http://swagger.io/terms/
+  title: Zipway URL Shortener API
+  version: 1.0.0
+paths:
+  /{slug}:
+    get:
+      consumes:
+      - application/json
+      description: Redirects to the original URL associated with the provided slug
+      parameters:
+      - description: Shortened link slug
+        example: abc123
+        in: path
+        name: slug
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "301":
+          description: Permanent redirect
+          schema:
+            type: string
+        "404":
+          description: Link not found
+          schema:
+            type: string
+      summary: Redirect to original URL
+      tags:
+      - links
+  /api/resolve/{slug}:
+    get:
+      consumes:
+      - application/json
+      description: Returns the target URL for a given slug. Public endpoint, no authentication
+        required.
+      parameters:
+      - description: Shortened link slug
+        example: abc123
+        in: path
+        name: slug
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Target URL
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Link not found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Resolve a shortened link
+      tags:
+      - links
+  /api/shorten:
+    post:
+      consumes:
+      - application/json
+      description: Create a new shortened link from a URL. Requires authentication.
+        Optionally allows defining a custom slug. Reserved slugs (api, swagger, shorten,
+        admin, health, metrics, docs, static, assets, favicon.ico) cannot be used.
+      parameters:
+      - description: Link data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateShortLinkRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Link created successfully
+          schema:
+            $ref: '#/definitions/handlers.CreateShortLinkResponse'
+        "400":
+          description: Validation error or reserved slug
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Custom slug already exists
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Create a shortened link
+      tags:
+      - links
+schemes:
+- http
+- https
+swagger: "2.0"

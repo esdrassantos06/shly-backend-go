@@ -1,0 +1,10 @@
+.env
+.env.local
+.git
+.gitignore
+README.md
+DEPLOY.md
+*.md
+docs/
+.vscode/
+.idea/
