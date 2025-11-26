@@ -8,7 +8,7 @@ services:
     environment:
       - ALLOWED_ORIGIN=${ALLOWED_ORIGIN}
       - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=${REDIS_URL}
       - BASE_URL=${BASE_URL}
     depends_on:
       - redis

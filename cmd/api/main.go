@@ -97,5 +97,10 @@ func main() {
 	api := app.Group("/api", authMiddleware.RequireAuth)
 	api.Post("/shorten", httpHandler.CreateShortLink)
 
-	log.Fatal(app.Listen(":8080"))
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Fatal(app.Listen(":" + port))
 }
