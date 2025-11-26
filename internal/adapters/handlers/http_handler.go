@@ -155,5 +155,7 @@ func (h *HTTPHandler) ResolveSlug(c fiber.Ctx) error {
 		return c.Status(404).JSON(ErrorResponse{Error: "Link not found"})
 	}
 
+	c.Set("Cache-Control", "public, max-age=60, s-maxage=60, stale-while-revalidate=300")
+
 	return c.JSON(fiber.Map{"target_url": target})
 }

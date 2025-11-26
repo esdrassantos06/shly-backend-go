@@ -40,6 +40,15 @@ func GetSessionFromCookie(cookieHeader string) (string, error) {
 			}
 			return decoded, nil
 		}
+
+		if strings.HasPrefix(cookie, "better-auth.session_token=") {
+			token := strings.TrimPrefix(cookie, "better-auth.session_token=")
+			decoded, err := url.QueryUnescape(token)
+			if err != nil {
+				return token, nil
+			}
+			return decoded, nil
+		}
 	}
 
 	return "", errors.New("session cookie not found")
