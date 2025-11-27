@@ -30,7 +30,6 @@ func (am *AuthMiddleware) RequireAuth(c fiber.Ctx) error {
 		})
 	}
 
-	// Store the userID in the context for use in the handlers
 	c.Locals("userID", userID)
 
 	return c.Next()

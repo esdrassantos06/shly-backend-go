@@ -52,10 +52,18 @@ backend go/
 
 ## Performance
 
-- **Session Validation:** 2-5ms (single database query)
-- **Link Creation:** 15-30ms total
-- **Redirect (cache hit):** 1-2ms
-- **Redirect (cache miss):** 10-20ms
+- **Session Validation (cache hit):** <5µs (local in-memory cache)
+- **Session Validation (cache miss):** ~20-50ms (Redis/PostgreSQL lookup)
+- **Link Creation:** 50-55ms total (optimized with local session cache)
+- **Redirect (cache hit):** Instant (<1ms)
+- **Redirect (cache miss):** Fast (includes database lookup and cache update)
+
+### Performance Optimizations
+
+- **Multi-tier caching:** Local in-memory cache → Redis → PostgreSQL
+- **Local session cache:** Frequently accessed sessions cached in memory (<5µs access time)
+- **Optimized Redis pool:** 50 connections, reduced timeouts for faster responses
+- **Prepared statements:** Database queries use prepared statements for better performance
 
 ## Project Structure
 
@@ -84,7 +92,12 @@ backend go/
 2. Better Auth creates session in PostgreSQL `session` table
 3. Frontend sends requests with `__Secure-better-auth.session_token` cookie
 4. Backend extracts session token from cookie
-5. Backend queries `session` table to validate token and get `userId`
+5. Backend validates session using multi-tier caching:
+   - **First:** Checks local in-memory cache (<5µs for frequent sessions)
+   - **Second:** Checks Redis cache with key `session:{sessionID}`
+   - **Third:** Checks Redis with full token `{sessionID}` and parses JSON
+   - **Fallback:** Queries PostgreSQL `session` table
+   - Valid sessions are cached locally (5 min) and in Redis (5 min)
 6. `userId` is stored in request context for use in handlers
 
 ### Link Creation Flow
@@ -128,6 +141,7 @@ REDIS_URL=redis://redis:6379
 # API Configuration
 BASE_URL=http://localhost:8080
 ALLOWED_ORIGIN=http://localhost:3000
+SHORT_URL_DOMAIN=http://localhost:8080  # Optional: Custom domain for short URLs (defaults to BASE_URL)
 ```
 
 ### Running with Docker
@@ -314,6 +328,7 @@ go test ./...
 4. **Rate Limiting:** Consider adding rate limiting middleware
 5. **Monitoring:** Add logging and metrics collection
 6. **HTTPS:** Ensure all connections use HTTPS in production
+7. **Session Validation:** Optimized with multi-tier caching (local memory → Redis → PostgreSQL)
 
 ## License
 

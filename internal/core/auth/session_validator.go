@@ -13,20 +13,48 @@ import (
 	"github.com/esdrassantos06/go-shortener/internal/core/ports"
 )
 
+type sessionCacheEntry struct {
+	userID    string
+	expiresAt time.Time
+}
+
 type SessionValidator struct {
 	DB           *sql.DB
 	Cache        ports.CacheRepository
 	validateStmt *sql.Stmt
 	initOnce     sync.Once
+
+	localCache      map[string]sessionCacheEntry
+	localCacheMutex sync.RWMutex
 }
 
 func NewSessionValidator(db *sql.DB, cache ports.CacheRepository) *SessionValidator {
 	sv := &SessionValidator{
-		DB:    db,
-		Cache: cache,
+		DB:         db,
+		Cache:      cache,
+		localCache: make(map[string]sessionCacheEntry),
 	}
 	sv.initOnce.Do(sv.initStatements)
+
+	go sv.cleanupLocalCache()
+
 	return sv
+}
+
+func (sv *SessionValidator) cleanupLocalCache() {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		sv.localCacheMutex.Lock()
+		now := time.Now()
+		for key, entry := range sv.localCache {
+			if entry.expiresAt.Before(now) {
+				delete(sv.localCache, key)
+			}
+		}
+		sv.localCacheMutex.Unlock()
+	}
 }
 
 func (sv *SessionValidator) initStatements() {
@@ -93,7 +121,28 @@ func (sv *SessionValidator) ValidateSession(ctx context.Context, sessionToken st
 	}
 	cacheKey := "session:" + sessionID
 
+	sv.localCacheMutex.RLock()
+	if entry, exists := sv.localCache[cacheKey]; exists {
+		if entry.expiresAt.After(time.Now()) {
+			sv.localCacheMutex.RUnlock()
+			return entry.userID, nil
+		}
+
+		sv.localCacheMutex.RUnlock()
+		sv.localCacheMutex.Lock()
+		delete(sv.localCache, cacheKey)
+		sv.localCacheMutex.Unlock()
+	} else {
+		sv.localCacheMutex.RUnlock()
+	}
+
 	if cachedUserID, err := sv.Cache.Get(ctx, cacheKey); err == nil && cachedUserID != "" {
+		sv.localCacheMutex.Lock()
+		sv.localCache[cacheKey] = sessionCacheEntry{
+			userID:    cachedUserID,
+			expiresAt: time.Now().Add(5 * time.Minute),
+		}
+		sv.localCacheMutex.Unlock()
 		return cachedUserID, nil
 	}
 
@@ -116,6 +165,13 @@ func (sv *SessionValidator) ValidateSession(ctx context.Context, sessionToken st
 					userID = sessionData.User.ID
 				}
 				if userID != "" {
+					sv.localCacheMutex.Lock()
+					sv.localCache[cacheKey] = sessionCacheEntry{
+						userID:    userID,
+						expiresAt: sessionData.Session.ExpiresAt,
+					}
+					sv.localCacheMutex.Unlock()
+
 					go func() {
 						_ = sv.Cache.Set(context.Background(), cacheKey, userID, 300)
 					}()
@@ -127,6 +183,13 @@ func (sv *SessionValidator) ValidateSession(ctx context.Context, sessionToken st
 
 	var userID string
 	if err := sv.validateStmt.QueryRowContext(ctx, sessionID).Scan(&userID); err == nil {
+		sv.localCacheMutex.Lock()
+		sv.localCache[cacheKey] = sessionCacheEntry{
+			userID:    userID,
+			expiresAt: time.Now().Add(5 * time.Minute),
+		}
+		sv.localCacheMutex.Unlock()
+
 		go func() {
 			_ = sv.Cache.Set(context.Background(), cacheKey, userID, 300)
 		}()

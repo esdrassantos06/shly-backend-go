@@ -52,10 +52,15 @@ func main() {
 	db.SetConnMaxIdleTime(5 * time.Minute)
 
 	opt, _ := redis.ParseURL(redisURL)
-	opt.PoolSize = 20
-	opt.MinIdleConns = 5
-	opt.MaxRetries = 3
-	opt.PoolTimeout = 4 * time.Second
+	opt.PoolSize = 50
+	opt.MinIdleConns = 20
+	opt.MaxRetries = 2
+	opt.PoolTimeout = 2 * time.Second
+	opt.DialTimeout = 2 * time.Second
+	opt.ReadTimeout = 1 * time.Second
+	opt.WriteTimeout = 1 * time.Second
+	opt.ConnMaxIdleTime = 5 * time.Minute
+	opt.ConnMaxLifetime = 30 * time.Minute
 	rdb := redis.NewClient(opt)
 
 	linkRepo := repositories.NewPostgresRepo(db)
