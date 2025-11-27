@@ -20,5 +20,5 @@ type CacheRepository interface {
 
 type LinkService interface {
 	ShortenURL(ctx context.Context, targetURL string, customSlug string, userID *string) (domain.Link, error)
-	ResolveURL(ctx context.Context, shortID string) (string, error)
+	ResolveURL(ctx context.Context, shortID string) (domain.Link, error)
 }

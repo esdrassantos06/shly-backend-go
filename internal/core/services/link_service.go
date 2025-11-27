@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log"
 
@@ -47,35 +48,52 @@ func (s *DefaultLinkService) ShortenURL(ctx context.Context, targetURL string, c
 		return domain.Link{}, err
 	}
 
-	go func() {
-		_ = s.Cache.Set(context.Background(), "url"+shortID, targetURL, 86400)
-	}()
+	go s.cacheLink(link)
 
 	return link, nil
 }
 
-func (s *DefaultLinkService) ResolveURL(ctx context.Context, shortID string) (string, error) {
-	val, err := s.Cache.Get(ctx, "url"+shortID)
-	if err == nil && val != "" {
-		go s.trackClick(shortID)
-		return val, nil
+type cachedLink struct {
+	TargetURL string            `json:"target_url"`
+	Status    domain.LinkStatus `json:"status"`
+}
+
+func (s *DefaultLinkService) ResolveURL(ctx context.Context, shortID string) (domain.Link, error) {
+	if shortID == "" {
+		return domain.Link{}, errors.New("shortID is required")
+	}
+
+	cacheKey := "url" + shortID
+	if val, err := s.Cache.Get(ctx, cacheKey); err == nil && val != "" {
+		var cached cachedLink
+		if json.Unmarshal([]byte(val), &cached) == nil {
+			if cached.Status == domain.StatusPaused {
+				return domain.Link{}, errors.New("link is paused")
+			}
+			go s.trackClick(shortID)
+			return domain.Link{
+				ShortID:   shortID,
+				TargetURL: cached.TargetURL,
+				Status:    cached.Status,
+			}, nil
+		}
 	}
 
 	link, err := s.Repo.GetByShortID(ctx, shortID)
 	if err != nil {
-		return "", err
+		return domain.Link{}, err
 	}
 
 	if link.Status == domain.StatusPaused {
-		return "", errors.New("link is paused")
+		return domain.Link{}, errors.New("link is paused")
 	}
 
-	go func() {
-		_ = s.Cache.Set(context.Background(), "url"+shortID, link.TargetURL, 86400)
+	go func(l domain.Link) {
+		s.cacheLink(l)
 		s.trackClick(shortID)
-	}()
+	}(link)
 
-	return link.TargetURL, nil
+	return link, nil
 }
 
 func (s *DefaultLinkService) trackClick(shortID string) {
@@ -85,4 +103,16 @@ func (s *DefaultLinkService) trackClick(shortID string) {
 	if err := s.Repo.IncrementClicks(ctx, shortID); err != nil {
 		log.Printf("failed to increment clicks for shortID %s: %v", shortID, err)
 	}
+}
+
+func (s *DefaultLinkService) cacheLink(link domain.Link) {
+	cacheKey := "url" + link.ShortID
+	payload, err := json.Marshal(cachedLink{
+		TargetURL: link.TargetURL,
+		Status:    link.Status,
+	})
+	if err != nil {
+		return
+	}
+	_ = s.Cache.Set(context.Background(), cacheKey, string(payload), 86400)
 }

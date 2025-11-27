@@ -135,12 +135,12 @@ func (h *HTTPHandler) CreateShortLink(c fiber.Ctx) error {
 func (h *HTTPHandler) Redirect(c fiber.Ctx) error {
 	slug := c.Params("slug")
 
-	target, err := h.Service.ResolveURL(c.Context(), slug)
+	link, err := h.Service.ResolveURL(c.Context(), slug)
 	if err != nil {
 		return c.Status(404).SendString("Link not found")
 	}
 
-	return c.Redirect().Status(fiber.StatusMovedPermanently).To(target)
+	return c.Redirect().Status(fiber.StatusMovedPermanently).To(link.TargetURL)
 }
 
 // ResolveSlug - Public endpoint for resolving (used by the frontend)
@@ -156,12 +156,15 @@ func (h *HTTPHandler) Redirect(c fiber.Ctx) error {
 func (h *HTTPHandler) ResolveSlug(c fiber.Ctx) error {
 	slug := c.Params("slug")
 
-	target, err := h.Service.ResolveURL(c.Context(), slug)
+	link, err := h.Service.ResolveURL(c.Context(), slug)
 	if err != nil {
 		return c.Status(404).JSON(ErrorResponse{Error: "Link not found"})
 	}
 
 	c.Set("Cache-Control", "public, max-age=60, s-maxage=60, stale-while-revalidate=300")
 
-	return c.JSON(fiber.Map{"target_url": target})
+	return c.JSON(fiber.Map{
+		"target_url": link.TargetURL,
+		"status":     link.Status,
+	})
 }
