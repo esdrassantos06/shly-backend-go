@@ -12,14 +12,16 @@ import (
 )
 
 type HTTPHandler struct {
-	Service ports.LinkService
-	BaseURL string
+	Service        ports.LinkService
+	BaseURL        string
+	ShortURLDomain string
 }
 
-func NewHTTPHandler(service ports.LinkService, baseURL string) *HTTPHandler {
+func NewHTTPHandler(service ports.LinkService, baseURL string, shortURLDomain string) *HTTPHandler {
 	return &HTTPHandler{
-		Service: service,
-		BaseURL: baseURL,
+		Service:        service,
+		BaseURL:        baseURL,
+		ShortURLDomain: shortURLDomain,
 	}
 }
 
@@ -110,8 +112,12 @@ func (h *HTTPHandler) CreateShortLink(c fiber.Ctx) error {
 		return c.Status(500).JSON(ErrorResponse{Error: "An error occurred while creating the link"})
 	}
 
+	shortURLDomain := h.ShortURLDomain
+	if shortURLDomain == "" {
+		shortURLDomain = h.BaseURL
+	}
 	return c.JSON(CreateShortLinkResponse{
-		ShortURL: fmt.Sprintf("%s/%s", h.BaseURL, link.ShortID),
+		ShortURL: fmt.Sprintf("%s/%s", shortURLDomain, link.ShortID),
 		Details:  link,
 	})
 }

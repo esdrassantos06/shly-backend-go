@@ -65,7 +65,11 @@ func main() {
 	if baseURL == "" {
 		baseURL = "http://localhost:8080"
 	}
-	httpHandler := handlers.NewHTTPHandler(linkService, baseURL)
+	shortURLDomain := os.Getenv("SHORT_URL_DOMAIN")
+	if shortURLDomain == "" {
+		shortURLDomain = baseURL
+	}
+	httpHandler := handlers.NewHTTPHandler(linkService, baseURL, shortURLDomain)
 
 	sessionValidator := auth.NewSessionValidator(db, cacheRepo)
 	authMiddleware := middleware.NewAuthMiddleware(sessionValidator)
