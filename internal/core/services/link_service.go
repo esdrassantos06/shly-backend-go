@@ -24,20 +24,26 @@ func (s *DefaultLinkService) ShortenURL(ctx context.Context, targetURL string, c
 		return domain.Link{}, errors.New("userID is required")
 	}
 
-	shortID := customSlug
-	if shortID == "" {
-		shortID = uuid.New().String()[:6]
+	var linkID, shortID string
+	if customSlug == "" {
+		linkUUID := uuid.New().String()
+		linkID = linkUUID
+		shortID = linkUUID[:6]
+	} else {
+		shortID = customSlug
+		linkID = uuid.New().String()
 	}
 
 	link := domain.Link{
-		ID:        uuid.New().String(),
+		ID:        linkID,
 		ShortID:   shortID,
 		TargetURL: targetURL,
 		UserID:    userID,
 		Status:    domain.StatusActive,
 	}
 
-	if err := s.Repo.Save(ctx, link); err != nil {
+	link, err := s.Repo.Save(ctx, link)
+	if err != nil {
 		return domain.Link{}, err
 	}
 

@@ -46,7 +46,16 @@ func main() {
 	}
 	defer db.Close()
 
+	db.SetMaxOpenConns(50)
+	db.SetMaxIdleConns(10)
+	db.SetConnMaxLifetime(10 * time.Minute)
+	db.SetConnMaxIdleTime(5 * time.Minute)
+
 	opt, _ := redis.ParseURL(redisURL)
+	opt.PoolSize = 20
+	opt.MinIdleConns = 5
+	opt.MaxRetries = 3
+	opt.PoolTimeout = 4 * time.Second
 	rdb := redis.NewClient(opt)
 
 	linkRepo := repositories.NewPostgresRepo(db)
@@ -62,8 +71,10 @@ func main() {
 	authMiddleware := middleware.NewAuthMiddleware(sessionValidator)
 
 	app := fiber.New(fiber.Config{
-		ServerHeader: "Zipway",
-		AppName:      "Zipway URL Shortener",
+		ServerHeader:      "Zipway",
+		AppName:           "Zipway URL Shortener",
+		DisableKeepalive:  false,
+		ReduceMemoryUsage: true,
 	})
 	app.Use(logger.New())
 

@@ -2,11 +2,12 @@ package ports
 
 import (
 	"context"
+
 	"github.com/esdrassantos06/go-shortener/internal/core/domain"
 )
 
 type LinkRepository interface {
-	Save(ctx context.Context, link domain.Link) error
+	Save(ctx context.Context, link domain.Link) (domain.Link, error)
 	GetByShortID(ctx context.Context, shortID string) (domain.Link, error)
 	IncrementClicks(ctx context.Context, shortID string) error
 }
